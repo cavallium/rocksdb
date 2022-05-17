@@ -5,6 +5,10 @@
 
 package org.rocksdb;
 
+import io.netty5.buffer.api.Drop;
+import io.netty5.buffer.api.Owned;
+import io.netty5.buffer.api.internal.ResourceSupport;
+
 /**
  * AbstractNativeReference is the base-class of all RocksDB classes that have
  * a pointer to a native C++ {@code rocksdb} object.
@@ -26,7 +30,13 @@ package org.rocksdb;
  * and cannot know what other resources depend on it.
  * </p>
  */
-public abstract class AbstractNativeReference implements AutoCloseable {
+public abstract class AbstractNativeReference<T extends AbstractNativeReference<T>>
+        extends ResourceSupport<AbstractNativeReference<T>, T> {
+
+  protected AbstractNativeReference(Drop<T> drop) {
+    super(drop);
+  }
+
   /**
    * Returns true if we are responsible for freeing the underlying C++ object
    *
@@ -34,15 +44,12 @@ public abstract class AbstractNativeReference implements AutoCloseable {
    */
   protected abstract boolean isOwningHandle();
 
-  /**
-   * Frees the underlying C++ object
-   * <p>
-   * It is strong recommended that the developer calls this after they
-   * have finished using the object.</p>
-   * <p>
-   * Note, that once an instance of {@link AbstractNativeReference} has been
-   * closed, calling any of its functions will lead to undefined
-   * behavior.</p>
-   */
-  @Override public abstract void close();
+  @Override protected RuntimeException createResourceClosedException() {
+    return new IllegalStateException("Resource is closed");
+  }
+
+  @Override protected final Owned<T> prepareSend() {
+    throw new UnsupportedOperationException("Sends are not supported");
+  }
+
 }

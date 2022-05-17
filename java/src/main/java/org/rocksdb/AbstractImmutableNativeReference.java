@@ -5,6 +5,7 @@
 
 package org.rocksdb;
 
+import io.netty5.buffer.api.Drop;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -14,21 +15,36 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 //@ThreadSafe
 public abstract class AbstractImmutableNativeReference
-    extends AbstractNativeReference {
+    extends AbstractNativeReference<AbstractImmutableNativeReference> {
+
+  private static final Drop<AbstractImmutableNativeReference> DROP = new Drop<AbstractImmutableNativeReference>() {
+    @Override public void drop(AbstractImmutableNativeReference obj) {
+      obj.disposeInternal(obj.owningHandle_);
+    }
+
+    @Override public Drop<AbstractImmutableNativeReference> fork() {
+      return this;
+    }
+
+    @Override public void attach(AbstractImmutableNativeReference obj) {
+
+    }
+  };
 
   /**
    * A flag indicating whether the current {@code AbstractNativeReference} is
    * responsible to free the underlying C++ object
    */
-  protected final AtomicBoolean owningHandle_;
+  protected volatile boolean owningHandle_;
 
   protected AbstractImmutableNativeReference(final boolean owningHandle) {
-    this.owningHandle_ = new AtomicBoolean(owningHandle);
+    super(DROP);
+    this.owningHandle_ = owningHandle;
   }
 
   @Override
   public boolean isOwningHandle() {
-    return owningHandle_.get();
+    return owningHandle_ && isAccessible();
   }
 
   /**
@@ -46,14 +62,7 @@ public abstract class AbstractImmutableNativeReference
    * </p>
    */
   protected final void disOwnNativeHandle() {
-    owningHandle_.set(false);
-  }
-
-  @Override
-  public void close() {
-    if (owningHandle_.compareAndSet(true, false)) {
-      disposeInternal();
-    }
+    owningHandle_ = false;
   }
 
   /**
@@ -61,5 +70,5 @@ public abstract class AbstractImmutableNativeReference
    * which all subclasses of {@code AbstractImmutableNativeReference} must
    * implement to release their underlying native C++ objects.
    */
-  protected abstract void disposeInternal();
+  protected abstract void disposeInternal(boolean owningHandle);
 }

@@ -46,13 +46,15 @@ public abstract class NativeComparatorWrapper
   }
 
   /**
-   * We override {@link RocksCallbackObject#disposeInternal()}
+   * We override {@link RocksCallbackObject#disposeInternal(boolean)}
    * as disposing of a native rocksdb::Comparator extension requires
    * a slightly different approach as it is not really a RocksCallbackObject
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
 
   private native void disposeInternal(final long handle);

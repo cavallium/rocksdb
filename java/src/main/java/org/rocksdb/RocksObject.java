@@ -33,8 +33,10 @@ public abstract class RocksObject extends AbstractImmutableNativeReference {
    * Deletes underlying C++ object pointer.
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
 
   protected abstract void disposeInternal(final long handle);

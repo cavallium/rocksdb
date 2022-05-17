@@ -5,6 +5,9 @@
 
 package org.rocksdb;
 
+import io.netty5.buffer.api.Drop;
+import io.netty5.buffer.api.Owned;
+
 /**
  * RocksMutableObject is an implementation of {@link AbstractNativeReference}
  * whose reference to the underlying native C++ object can change.
@@ -13,7 +16,21 @@ package org.rocksdb;
  * has synchronization overheads and introduces complexity. Instead it is
  * recommended to use {@link RocksObject} where possible.</p>
  */
-public abstract class RocksMutableObject extends AbstractNativeReference {
+public abstract class RocksMutableObject extends AbstractNativeReference<RocksMutableObject> {
+
+  private static final Drop<RocksMutableObject> DROP = new Drop<RocksMutableObject>() {
+    @Override public void drop(RocksMutableObject obj) {
+      obj.doDrop();
+    }
+
+    @Override public Drop<RocksMutableObject> fork() {
+      return this;
+    }
+
+    @Override public void attach(RocksMutableObject obj) {
+
+    }
+  };
 
   /**
    * An mutable reference to the value of the C++ pointer pointing to some
@@ -23,9 +40,11 @@ public abstract class RocksMutableObject extends AbstractNativeReference {
   private boolean owningHandle_;
 
   protected RocksMutableObject() {
+    super(DROP);
   }
 
   protected RocksMutableObject(final long nativeHandle) {
+    super(DROP);
     this.nativeHandle_ = nativeHandle;
     this.owningHandle_ = true;
   }
@@ -56,7 +75,7 @@ public abstract class RocksMutableObject extends AbstractNativeReference {
 
   @Override
   protected synchronized boolean isOwningHandle() {
-    return this.owningHandle_;
+    return this.owningHandle_ && isAccessible();
   }
 
   /**
@@ -70,12 +89,10 @@ public abstract class RocksMutableObject extends AbstractNativeReference {
     return this.nativeHandle_;
   }
 
-  @Override
-  public synchronized final void close() {
+  private synchronized void doDrop() {
     if (isOwningHandle()) {
       disposeInternal();
-      this.owningHandle_ = false;
-      this.nativeHandle_ = 0;
+      nativeHandle_ = 0;
     }
   }
 

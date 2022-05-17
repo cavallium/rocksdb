@@ -27,8 +27,10 @@ public abstract class Filter extends RocksObject {
    * Otherwise an undefined behavior will occur.
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
 
   @Override

@@ -136,9 +136,11 @@ public class ColumnFamilyHandle extends RocksObject {
    * initialized before freeing the native handle.</p>
    */
   @Override
-  protected void disposeInternal() {
-    if(rocksDB_.isOwningHandle()) {
-      disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      if (rocksDB_.isOwningHandle()) {
+        disposeInternal(nativeHandle_);
+      }
     }
   }
 

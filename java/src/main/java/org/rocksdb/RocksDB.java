@@ -39,6 +39,8 @@ public class RocksDB extends RocksObject {
 
   private final List<ColumnFamilyHandle> ownedColumnFamilyHandles = new ArrayList<>();
 
+  protected RocksDBException closeEx = null;
+
   /**
    * Loads the necessary library files.
    * Calling this method twice will have no effect.
@@ -607,45 +609,28 @@ public class RocksDB extends RocksObject {
    * @throws RocksDBException if an error occurs whilst closing.
    */
   public void closeE() throws RocksDBException {
-    for (final ColumnFamilyHandle columnFamilyHandle : ownedColumnFamilyHandles) {
-      columnFamilyHandle.close();
-    }
-    ownedColumnFamilyHandles.clear();
-
-    if (owningHandle_.compareAndSet(true, false)) {
-      try {
-        closeDatabase(nativeHandle_);
-      } finally {
-        disposeInternal();
-      }
+    this.close();
+    RocksDBException closeEx = this.closeEx;
+    if (closeEx != null) {
+      this.closeEx = null;
+      throw closeEx;
     }
   }
 
-  /**
-   * This is similar to {@link #closeE()} except that it
-   * silently ignores any errors.
-   *
-   * This will not fsync the WAL files.
-   * If syncing is required, the caller must first call {@link #syncWal()}
-   * or {@link #write(WriteOptions, WriteBatch)} using an empty write batch
-   * with {@link WriteOptions#setSync(boolean)} set to true.
-   *
-   * See also {@link #close()}.
-   */
   @Override
-  public void close() {
+  protected void disposeInternal(boolean owningHandle) {
     for (final ColumnFamilyHandle columnFamilyHandle : ownedColumnFamilyHandles) {
       columnFamilyHandle.close();
     }
     ownedColumnFamilyHandles.clear();
 
-    if (owningHandle_.compareAndSet(true, false)) {
+    if (owningHandle) {
       try {
         closeDatabase(nativeHandle_);
-      } catch (final RocksDBException e) {
-        // silently ignore the error report
+      } catch (RocksDBException e) {
+        closeEx = e;
       } finally {
-        disposeInternal();
+        super.disposeInternal(true);
       }
     }
   }

@@ -123,10 +123,12 @@ public abstract class AbstractRocksIterator<P extends RocksObject>
    * before freeing the native handle.</p>
    */
   @Override
-  protected void disposeInternal() {
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
       if (parent_.isOwningHandle()) {
         disposeInternal(nativeHandle_);
       }
+    }
   }
 
   abstract boolean isValid0(long handle);
