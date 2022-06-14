@@ -285,7 +285,7 @@ JAVAC_VERSION_GE_MIN := $(shell [ $(JAVAC_MAJOR_VERSION) -ge $(MIN_JAVAC_MAJOR_V
 # Set the default JAVA_ARGS to "" for DEBUG_LEVEL=0
 JAVA_ARGS ?=
 
-JAVAC_ARGS ?= -release $(MIN_JAVAC_MAJOR_VERSION)
+JAVAC_ARGS ?= -source $(MIN_JAVAC_MAJOR_VERSION)
 
 # Read plugin configuration
 PLUGIN_PATH = ../plugin
