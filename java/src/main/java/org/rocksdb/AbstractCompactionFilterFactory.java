@@ -63,13 +63,15 @@ public abstract class AbstractCompactionFilterFactory<T extends AbstractCompacti
   public abstract String name();
 
   /**
-   * We override {@link RocksCallbackObject#disposeInternal()}
+   * We override {@link RocksCallbackObject#disposeInternal(boolean)}
    * as disposing of a rocksdb::AbstractCompactionFilterFactory requires
    * a slightly different approach as it is a std::shared_ptr
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
 
   private native long createNewCompactionFilterFactory0();

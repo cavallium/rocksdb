@@ -5,6 +5,9 @@
 
 package org.rocksdb;
 
+import io.netty5.buffer.api.Drop;
+import io.netty5.buffer.api.Owned;
+
 /**
  * RocksMutableObject is an implementation of {@link AbstractNativeReference}
  * whose reference to the underlying native C++ object can change.
@@ -23,9 +26,11 @@ public abstract class RocksMutableObject extends AbstractNativeReference {
   private boolean owningHandle_;
 
   protected RocksMutableObject() {
+    super(false);
   }
 
   protected RocksMutableObject(final long nativeHandle) {
+    super(true);
     this.nativeHandle_ = nativeHandle;
     this.owningHandle_ = true;
   }
@@ -52,11 +57,12 @@ public abstract class RocksMutableObject extends AbstractNativeReference {
       final boolean owningNativeHandle) {
     this.nativeHandle_ = nativeHandle;
     this.owningHandle_ = owningNativeHandle;
+    this.setReportLeak(owningNativeHandle);
   }
 
   @Override
   protected synchronized boolean isOwningHandle() {
-    return this.owningHandle_;
+    return this.owningHandle_ && isAccessible();
   }
 
   /**
@@ -70,12 +76,10 @@ public abstract class RocksMutableObject extends AbstractNativeReference {
     return this.nativeHandle_;
   }
 
-  @Override
-  public synchronized final void close() {
+  @Override protected synchronized void dispose() {
     if (isOwningHandle()) {
       disposeInternal();
-      this.owningHandle_ = false;
-      this.nativeHandle_ = 0;
+      nativeHandle_ = 0;
     }
   }
 

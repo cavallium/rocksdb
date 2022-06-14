@@ -325,8 +325,10 @@ public abstract class AbstractEventListener extends RocksCallbackObject implemen
    * Deletes underlying C++ native callback object pointer
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
 
   private native long createNewEventListener(final long enabledEventCallbackValues);

@@ -97,3 +97,15 @@ fuzz/crash-*
 
 cmake-build-*
 third-party/folly/
+
+*.gz
+
+bzip2-1.0.8/
+
+lz4-1.9.3/
+
+snappy-1.1.8/
+
+zlib-1.2.12/
+
+zstd-1.4.9/

@@ -211,6 +211,15 @@ SAMPLES_MAIN_SRC = samples/src/main/java
 SAMPLES_OUTPUT = samples/target
 SAMPLES_MAIN_CLASSES = $(SAMPLES_OUTPUT)/classes
 
+JAVA_MAIN_LIBDIR = main-libs
+JAVA_NETTYC_VER = 5.0.0.Alpha2
+JAVA_NETTYC_SHA256 = 17c33fd709dbef951adb48e502b26cc2938219ddc6971038440b804af05e6f4f
+JAVA_NETTYC_JAR = netty5-common-$(JAVA_NETTYC_VER).jar
+JAVA_NETTYC_JAR_PATH = $(JAVA_MAIN_LIBDIR)/$(JAVA_NETTYC_JAR)
+JAVA_NETTYB_VER = 5.0.0.Alpha2
+JAVA_NETTYB_SHA256 = ac407d92078ba503a6445aa9df1e7608b41d5e5560eb2e951e82d643528f5e2a
+JAVA_NETTYB_JAR = netty5-buffer-$(JAVA_NETTYB_VER).jar
+JAVA_NETTYB_JAR_PATH = $(JAVA_MAIN_LIBDIR)/$(JAVA_NETTYB_JAR)
 JAVA_TEST_LIBDIR = test-libs
 JAVA_JUNIT_VER = 4.13.1
 JAVA_JUNIT_SHA256 = c30719db974d6452793fe191b3638a5777005485bae145924044530ffa5f6122
@@ -232,7 +241,8 @@ JAVA_ASSERTJ_VER = 2.9.0
 JAVA_ASSERTJ_SHA256 = 5e88ea3ecbe3c48aa1346fec76c84979fa9c8d22499f11479011691230e8babf
 JAVA_ASSERTJ_JAR = assertj-core-$(JAVA_ASSERTJ_VER).jar
 JAVA_ASSERTJ_JAR_PATH = $(JAVA_TEST_LIBDIR)/$(JAVA_ASSERTJ_JAR)
-JAVA_TESTCLASSPATH = $(JAVA_JUNIT_JAR_PATH):$(JAVA_HAMCREST_JAR_PATH):$(JAVA_MOCKITO_JAR_PATH):$(JAVA_CGLIB_JAR_PATH):$(JAVA_ASSERTJ_JAR_PATH)
+JAVA_MAINCLASSPATH = $(JAVA_NETTYC_JAR_PATH):$(JAVA_NETTYB_JAR_PATH)
+JAVA_TESTCLASSPATH = $(JAVA_MAINCLASSPATH):$(JAVA_JUNIT_JAR_PATH):$(JAVA_HAMCREST_JAR_PATH):$(JAVA_MOCKITO_JAR_PATH):$(JAVA_CGLIB_JAR_PATH):$(JAVA_ASSERTJ_JAR_PATH)
 
 MVN_LOCAL = ~/.m2/repository
 
@@ -269,13 +279,13 @@ JAVAC_MAJOR_VERSION := $(word 3,$(subst ., ,$(JAVAC_VERSION)))
 endif
 
 # Test whether the version we see meets our minimum
-MIN_JAVAC_MAJOR_VERSION := 8
+MIN_JAVAC_MAJOR_VERSION := 11
 JAVAC_VERSION_GE_MIN := $(shell [ $(JAVAC_MAJOR_VERSION) -ge $(MIN_JAVAC_MAJOR_VERSION) ] > /dev/null 2>&1 && echo true)
 
 # Set the default JAVA_ARGS to "" for DEBUG_LEVEL=0
 JAVA_ARGS ?=
 
-JAVAC_ARGS ?=
+JAVAC_ARGS ?= -release $(MIN_JAVAC_MAJOR_VERSION)
 
 # Read plugin configuration
 PLUGIN_PATH = ../plugin
@@ -322,6 +332,7 @@ clean-not-downloaded:
 	$(AM_V_at)rm -rf $(SAMPLES_OUTPUT)
 
 clean-downloaded:
+	$(AM_V_at)rm -rf $(JAVA_MAIN_LIBDIR)
 	$(AM_V_at)rm -rf $(JAVA_TEST_LIBDIR)
 
 
@@ -331,44 +342,70 @@ javadocs: java
 
 javalib: java java_test javadocs
 
-java: java-version
+java: java-version resolve_main_deps
 	$(AM_V_GEN)mkdir -p $(MAIN_CLASSES)
-	$(AM_V_at) $(JAVAC_CMD) $(JAVAC_ARGS) -h $(NATIVE_INCLUDE) -d $(MAIN_CLASSES) $(SOURCES)
+	$(AM_V_at) $(JAVAC_CMD) $(JAVAC_ARGS) -h $(NATIVE_INCLUDE) -cp $(JAVA_MAINCLASSPATH) -d $(MAIN_CLASSES) $(SOURCES)
 	$(AM_V_at)@cp ../HISTORY.md ./HISTORY-CPP.md
 	$(AM_V_at)@rm -f ./HISTORY-CPP.md
 
 sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBSample.java
+	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(JAVA_MAINCLASSPATH):$(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBSample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni_not_found
-	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBSample /tmp/rocksdbjni
+	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(JAVA_MAINCLASSPATH):$(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBSample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni_not_found
 
 column_family_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBColumnFamilySample.java
+	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_MAINCLASSPATH) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBColumnFamilySample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBColumnFamilySample /tmp/rocksdbjni
+	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(JAVA_MAINCLASSPATH):$(SAMPLES_MAIN_CLASSES) RocksDBColumnFamilySample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 
 transaction_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)$(JAVAC_CMD) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/TransactionSample.java
+	$(AM_V_at)$(JAVAC_CMD) -cp $(MAIN_CLASSES):$(JAVA_MAINCLASSPATH) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/TransactionSample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) TransactionSample /tmp/rocksdbjni
+	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(JAVA_MAINCLASSPATH):$(SAMPLES_MAIN_CLASSES) TransactionSample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 
 optimistic_transaction_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
-	$(AM_V_at)$(JAVAC_CMD) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/OptimisticTransactionSample.java
+	$(AM_V_at)$(JAVAC_CMD) -cp $(MAIN_CLASSES):$(JAVA_MAINCLASSPATH) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/OptimisticTransactionSample.java
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) OptimisticTransactionSample /tmp/rocksdbjni
+	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(JAVA_MAINCLASSPATH):$(SAMPLES_MAIN_CLASSES) OptimisticTransactionSample /tmp/rocksdbjni
 	$(AM_V_at)@rm -rf /tmp/rocksdbjni
 
 $(JAVA_TEST_LIBDIR):
 	mkdir -p "$(JAVA_TEST_LIBDIR)"
+$(JAVA_MAIN_LIBDIR):
+	mkdir -p "$(JAVA_MAIN_LIBDIR)"
+
+$(JAVA_NETTYC_JAR_PATH): $(JAVA_MAIN_LIBDIR)
+ifneq (,$(wildcard $(MVN_LOCAL)/io/netty/netty5-common/$(JAVA_NETTYC_VER)/$(JAVA_NETTYC_JAR)))
+	cp -v $(MVN_LOCAL)/io/netty/netty5-common/$(JAVA_NETTYC_VER)/$(JAVA_NETTYC_JAR) $(JAVA_MAIN_LIBDIR)
+else
+	curl --fail --insecure --output $(JAVA_NETTYC_JAR_PATH) --location $(DEPS_URL)/$(JAVA_NETTYC_JAR)
+	JAVA_NETTYC_SHA256_ACTUAL=`$(SHA256_CMD) $(JAVA_NETTYC_JAR_PATH) | cut -d ' ' -f 1`; \
+	if [ "$(JAVA_NETTYC_SHA256)" != "$$JAVA_NETTYC_SHA256_ACTUAL" ]; then \
+		echo $(JAVA_NETTYC_JAR_PATH) checksum mismatch, expected=\"$(JAVA_NETTYC_SHA256)\" actual=\"$$JAVA_NETTYC_SHA256_ACTUAL\"; \
+		exit 1; \
+	fi
+endif
+
+$(JAVA_NETTYB_JAR_PATH): $(JAVA_MAIN_LIBDIR)
+ifneq (,$(wildcard $(MVN_LOCAL)/io/netty/netty5-buffer/$(JAVA_NETTYB_VER)/$(JAVA_NETTYB_JAR)))
+	cp -v $(MVN_LOCAL)/io/netty/netty5-buffer/$(JAVA_NETTYB_VER)/$(JAVA_NETTYB_JAR) $(JAVA_MAIN_LIBDIR)
+else
+	curl --fail --insecure --output $(JAVA_NETTYB_JAR_PATH) --location $(DEPS_URL)/$(JAVA_NETTYB_JAR)
+	JAVA_NETTYB_SHA256_ACTUAL=`$(SHA256_CMD) $(JAVA_NETTYB_JAR_PATH) | cut -d ' ' -f 1`; \
+	if [ "$(JAVA_NETTYB_SHA256)" != "$$JAVA_NETTYB_SHA256_ACTUAL" ]; then \
+		echo $(JAVA_NETTYB_JAR_PATH) checksum mismatch, expected=\"$(JAVA_NETTYB_SHA256)\" actual=\"$$JAVA_NETTYB_SHA256_ACTUAL\"; \
+		exit 1; \
+	fi
+endif
 
 $(JAVA_JUNIT_JAR_PATH): $(JAVA_TEST_LIBDIR)
 ifneq (,$(wildcard $(MVN_LOCAL)/junit/junit/$(JAVA_JUNIT_VER)/$(JAVA_JUNIT_JAR)))
@@ -430,22 +467,24 @@ else
 	fi
 endif
 
+resolve_main_deps: $(JAVA_NETTYC_JAR_PATH) $(JAVA_NETTYB_JAR_PATH)
+
 resolve_test_deps: $(JAVA_JUNIT_JAR_PATH) $(JAVA_HAMCREST_JAR_PATH) $(JAVA_MOCKITO_JAR_PATH) $(JAVA_CGLIB_JAR_PATH) $(JAVA_ASSERTJ_JAR_PATH)
 
 java_test: java resolve_test_deps
 	$(AM_V_GEN)mkdir -p $(TEST_CLASSES)
-	$(AM_V_at) $(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_TESTCLASSPATH) -h $(NATIVE_INCLUDE) -d $(TEST_CLASSES)\
+	$(AM_V_at) $(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_MAINCLASSPATH):$(JAVA_TESTCLASSPATH) -h $(NATIVE_INCLUDE) -d $(TEST_CLASSES)\
 		$(TEST_SOURCES)
 
 test: java java_test
 	$(MAKE) run_test
 
 run_test:
-	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(TEST_CLASSES):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(ALL_JAVA_TESTS)
+	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(JAVA_MAINCLASSPATH):$(TEST_CLASSES):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(ALL_JAVA_TESTS)
 
 run_plugin_test:
-	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(TEST_CLASSES):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(ROCKSDB_PLUGIN_JAVA_TESTS)
+	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(JAVA_MAINCLASSPATH):$(TEST_CLASSES):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(ROCKSDB_PLUGIN_JAVA_TESTS)
 
 db_bench: java
 	$(AM_V_GEN)mkdir -p $(BENCHMARK_MAIN_CLASSES)
-	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(BENCHMARK_MAIN_CLASSES) $(BENCHMARK_MAIN_SRC)/org/rocksdb/benchmark/*.java
+	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(JAVA_MAINCLASSPATH):$(MAIN_CLASSES) -d $(BENCHMARK_MAIN_CLASSES) $(BENCHMARK_MAIN_SRC)/org/rocksdb/benchmark/*.java

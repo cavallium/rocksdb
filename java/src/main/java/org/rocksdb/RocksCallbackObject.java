@@ -65,8 +65,10 @@ public abstract class RocksCallbackObject extends
    * Deletes underlying C++ native callback object pointer
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
 
   private native void disposeInternal(final long handle);

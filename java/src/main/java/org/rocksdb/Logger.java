@@ -109,13 +109,15 @@ public abstract class Logger extends RocksCallbackObject {
   protected native byte infoLogLevel(long handle);
 
   /**
-   * We override {@link RocksCallbackObject#disposeInternal()}
+   * We override {@link RocksCallbackObject#disposeInternal(boolean)}
    * as disposing of a rocksdb::LoggerJniCallback requires
    * a slightly different approach as it is a std::shared_ptr
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
 
   private native void disposeInternal(final long handle);

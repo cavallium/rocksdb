@@ -47,8 +47,10 @@ public abstract class AbstractTransactionNotifier
    * Otherwise an undefined behavior will occur.
    */
   @Override
-  protected void disposeInternal() {
-    disposeInternal(nativeHandle_);
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
+      disposeInternal(nativeHandle_);
+    }
   }
   protected final native void disposeInternal(final long handle);
 }

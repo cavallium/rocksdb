@@ -93,10 +93,8 @@ public class WBWIRocksIterator
     }
   }
 
-  @Override
-  public void close() {
+  @Override protected void disposeInternal(boolean owningHandle) {
     entry.close();
-    super.close();
   }
 
   /**

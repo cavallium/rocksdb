@@ -5,8 +5,6 @@
 
 package org.rocksdb;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * Offers functionality for implementations of
  * {@link AbstractNativeReference} which have an immutable reference to the
@@ -20,15 +18,16 @@ public abstract class AbstractImmutableNativeReference
    * A flag indicating whether the current {@code AbstractNativeReference} is
    * responsible to free the underlying C++ object
    */
-  protected final AtomicBoolean owningHandle_;
+  protected volatile boolean owningHandle_;
 
   protected AbstractImmutableNativeReference(final boolean owningHandle) {
-    this.owningHandle_ = new AtomicBoolean(owningHandle);
+    super(owningHandle);
+    this.owningHandle_ = owningHandle;
   }
 
   @Override
   public boolean isOwningHandle() {
-    return owningHandle_.get();
+    return owningHandle_ && isAccessible();
   }
 
   /**
@@ -46,14 +45,8 @@ public abstract class AbstractImmutableNativeReference
    * </p>
    */
   protected final void disOwnNativeHandle() {
-    owningHandle_.set(false);
-  }
-
-  @Override
-  public void close() {
-    if (owningHandle_.compareAndSet(true, false)) {
-      disposeInternal();
-    }
+    setReportLeak(false);
+    owningHandle_ = false;
   }
 
   /**
@@ -61,5 +54,10 @@ public abstract class AbstractImmutableNativeReference
    * which all subclasses of {@code AbstractImmutableNativeReference} must
    * implement to release their underlying native C++ objects.
    */
-  protected abstract void disposeInternal();
+  protected abstract void disposeInternal(boolean owningHandle);
+
+  @Override
+  protected final void dispose() {
+    this.disposeInternal(this.owningHandle_);
+  }
 }

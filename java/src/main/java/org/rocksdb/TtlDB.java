@@ -155,35 +155,23 @@ public class TtlDB extends RocksDB {
    * @throws RocksDBException if an error occurs whilst closing.
    */
   public void closeE() throws RocksDBException {
-    if (owningHandle_.compareAndSet(true, false)) {
-      try {
-        closeDatabase(nativeHandle_);
-      } finally {
-        disposeInternal();
-      }
+    this.close();
+    RocksDBException closeEx = this.closeEx;
+    if (closeEx != null) {
+      this.closeEx = null;
+      throw closeEx;
     }
   }
 
-  /**
-   * <p>Close the TtlDB instance and release resource.</p>
-   *
-   *
-   * This will not fsync the WAL files.
-   * If syncing is required, the caller must first call {@link #syncWal()}
-   * or {@link #write(WriteOptions, WriteBatch)} using an empty write batch
-   * with {@link WriteOptions#setSync(boolean)} set to true.
-   *
-   * See also {@link #close()}.
-   */
   @Override
-  public void close() {
-    if (owningHandle_.compareAndSet(true, false)) {
+  protected void disposeInternal(boolean owningHandle) {
+    if (owningHandle) {
       try {
         closeDatabase(nativeHandle_);
-      } catch (final RocksDBException e) {
-        // silently ignore the error report
+      } catch (RocksDBException e) {
+        closeEx = e;
       } finally {
-        disposeInternal();
+        super.disposeInternal(true);
       }
     }
   }

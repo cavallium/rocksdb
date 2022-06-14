@@ -1,0 +1,73 @@
+name: Check buck targets and code format
+on: [push]
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout feature branch
+      uses: actions/checkout@v2
+    - name: Script
+      shell: bash
+      run: |
+            set -xe
+            REPODIR="$(pwd)"
+            export GTEST_THROW_ON_FAILURE=0
+            export GTEST_OUTPUT=\"xml:/tmp/test-results/\"
+            export SKIP_FORMAT_BUCK_CHECKS=1
+            export GTEST_COLOR=1
+            export CTEST_OUTPUT_ON_FAILURE=1
+            export CTEST_TEST_TIMEOUT=300
+            export ZLIB_DOWNLOAD_BASE=https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/zlib
+            export BZIP2_DOWNLOAD_BASE=https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/bzip2
+            export SNAPPY_DOWNLOAD_BASE=https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/snappy
+            export LZ4_DOWNLOAD_BASE=https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/lz4
+            export ZSTD_DOWNLOAD_BASE=https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/zstd
+            export DEBIAN_FRONTEND="noninteractive"
+            export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+            export PATH=$JAVA_HOME/bin:$PATH
+            
+            # install dev deps
+            
+            sudo apt-get update -y && sudo apt-get install -y libgflags-dev ninja-build valgrind cmake libsnappy-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev gnupg wget git make build-essential liblzma-dev openjdk-8-jdk curl unzip tar
+            
+            # install clang 10
+            
+            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+            echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-10 main" | sudo tee -a /etc/apt/sources.list
+            echo "deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-10 main" | sudo tee -a /etc/apt/sources.list
+            echo "APT::Acquire::Retries \"10\";" | sudo tee -a /etc/apt/apt.conf.d/80-retries # llvm.org unreliable
+            sudo apt-get update -y && sudo apt-get install -y clang-10
+            
+            # install clang 13
+            
+            echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main" | sudo tee -a /etc/apt/sources.list
+            echo "deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main" | sudo tee -a /etc/apt/sources.list
+            echo "APT::Acquire::Retries \"10\";" | sudo tee -a /etc/apt/apt.conf.d/80-retries # llvm.org unreliable
+            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+            sudo apt-get update -y && sudo apt-get install -y clang-13
+            
+            # install google/benchmark
+            
+            git clone --depth 1 --branch v1.6.1 https://github.com/google/benchmark.git ~/benchmark
+            cd ~/benchmark && mkdir build && cd build
+            cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_ENABLE_GTEST_TESTS=0
+            ninja && sudo ninja install
+            
+            # install google/gtest-parallel
+            
+            git clone --single-branch --branch master --depth 1 https://github.com/google/gtest-parallel.git ~/gtest-parallel
+            export PATH=$HOME/gtest-parallel:$PATH
+            
+            # install google/libprotobuf-mutator
+            
+            git clone --single-branch --branch master --depth 1 https://github.com/google/libprotobuf-mutator.git ~/libprotobuf-mutator
+            cd ~/libprotobuf-mutator && mkdir build && cd build
+            cmake .. -GNinja -DCMAKE_C_COMPILER=clang-13 -DCMAKE_CXX_COMPILER=clang++-13 -DCMAKE_BUILD_TYPE=Release -DLIB_PROTO_MUTATOR_DOWNLOAD_PROTOBUF=ON
+            ninja && sudo ninja install
+            export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/OFF/:~/libprotobuf-mutator/build/external.protobuf/lib/pkgconfig/
+            export PROTOC_BIN=~/libprotobuf-mutator/build/external.protobuf/bin/protoc
+            
+            # build rocksdb java
+            
+            cd "$REPODIR"; make V=0 J=8 -j8 rocksdbjavastaticpublish
